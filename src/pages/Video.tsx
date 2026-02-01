@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -59,6 +59,37 @@ const toBase64 = (dataUrl: string) => {
   return parts.length > 1 ? parts[1] : dataUrl
 }
 
+const MAX_REKOGNITION_BYTES = 5 * 1024 * 1024
+const IMAGE_SIZE_ERROR_MESSAGE = '画像サイズ上限(5MB)を超えています。別の画像で試してください。'
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('画像の読み込みに失敗しました。'))
+    reader.readAsDataURL(file)
+  })
+
+const estimateBase64Bytes = (dataUrl: string) => {
+  const base64 = toBase64(dataUrl)
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - padding
+}
+
+const ensureRekognitionSize = (dataUrl: string) => {
+  if (estimateBase64Bytes(dataUrl) > MAX_REKOGNITION_BYTES) {
+    throw new Error(IMAGE_SIZE_ERROR_MESSAGE)
+  }
+}
+
+const loadImage = (dataUrl: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('画像の読み込みに失敗しました。'))
+    img.src = dataUrl
+  })
+
 const normalizeVideo = (value: unknown, filename?: string) => {
   if (typeof value !== 'string' || !value) return null
   if (value.startsWith('data:') || value.startsWith('http')) return value
@@ -107,6 +138,36 @@ const isProbablyMobile = () => {
   return false
 }
 
+const normalizeErrorMessage = (value: unknown) => {
+  if (!value) return '生成に失敗しました。'
+  if (typeof value === 'object') {
+    const maybe = value as { error?: unknown; message?: unknown; detail?: unknown }
+    const picked = maybe?.error ?? maybe?.message ?? maybe?.detail
+    if (typeof picked === 'string' && picked) return picked
+    if (value instanceof Error && value.message) return value.message
+  }
+  const raw = typeof value === 'string' ? value : value instanceof Error ? value.message : String(value)
+  const lowered = raw.toLowerCase()
+  if (lowered.includes('invalidimageformatexception') || lowered.includes('invalid image format')) {
+    return '年齢判定はJPEG/PNGのみ対応です。別の画像で試してください。'
+  }
+  if (lowered.includes('image.bytes') || lowered.includes('5242880')) {
+    return IMAGE_SIZE_ERROR_MESSAGE
+  }
+  const trimmed = raw.trim()
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      const message = parsed?.error || parsed?.message || parsed?.detail
+      if (typeof message === 'string' && message) return message
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return raw
+}
+
+const normaliseErrorMessage = normalizeErrorMessage
 const extractErrorMessage = (payload: any) =>
   payload?.error ||
   payload?.message ||
@@ -354,7 +415,7 @@ export function Video() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const message = data?.error || data?.message || '生成に失敗しました。'
+        const message = normalizeErrorMessage(data?.error ?? data?.message ?? data?.detail ?? '生成に失敗しました。')
         throw new Error(message)
       }
       const nextTickets = Number(data?.ticketsLeft ?? data?.tickets_left)
@@ -382,7 +443,7 @@ export function Video() {
       const res = await fetch(`${API_ENDPOINT}?id=${encodeURIComponent(jobId)}`, { headers })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const message = data?.error || data?.message || 'ステータス取得に失敗しました。'
+        const message = normalizeErrorMessage(data?.error ?? data?.message ?? data?.detail ?? 'ステータス取得に失敗しました。')
         throw new Error(message)
       }
       const nextTickets = Number(data?.ticketsLeft ?? data?.tickets_left)
@@ -447,6 +508,7 @@ export function Video() {
               ),
             )
             setStatusMessage(message)
+            window.alert(message)
           }
         }]
 
@@ -461,6 +523,7 @@ export function Video() {
         const message = error instanceof Error ? error.message : '生成に失敗しました。'
         setStatusMessage(message)
         setResults((prev) => prev.map((item) => ({ ...item, status: 'error', error: message })))
+        window.alert(message)
       } finally {
         if (runIdRef.current === runId) {
           setIsRunning(false)
@@ -511,27 +574,27 @@ export function Video() {
     setSourceName('')
   }, [])
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '')
-      const img = new Image()
-      img.onload = () => {
-        const { width: targetWidth, height: targetHeight } = getTargetSize(img.naturalWidth, img.naturalHeight)
-        const paddedDataUrl = buildPaddedDataUrl(img, targetWidth, targetHeight) ?? dataUrl
-        const payload = toBase64(paddedDataUrl)
-        setWidth(targetWidth)
-        setHeight(targetHeight)
-        setSourcePreview(paddedDataUrl)
-        setSourcePayload(payload)
-        setSourceName(file.name)
-        setStatusMessage(session ? '生成準備OK' : 'Googleでログインしてください。')
-      }
-      img.src = dataUrl
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      const img = await loadImage(dataUrl)
+      const { width: targetWidth, height: targetHeight } = getTargetSize(img.naturalWidth, img.naturalHeight)
+      const paddedDataUrl = buildPaddedDataUrl(img, targetWidth, targetHeight) ?? dataUrl
+      ensureRekognitionSize(paddedDataUrl)
+      const payload = toBase64(paddedDataUrl)
+      setWidth(targetWidth)
+      setHeight(targetHeight)
+      setSourcePreview(paddedDataUrl)
+      setSourcePayload(payload)
+      setSourceName(file.name)
+      setStatusMessage(session ? '生成準備OK' : 'Googleでログインしてください。')
+    } catch (error) {
+      const message = normalizeErrorMessage(error instanceof Error ? error.message : error)
+      setStatusMessage(message)
+      window.alert(message)
     }
-    reader.readAsDataURL(file)
   }
 
   const handleGenerate = async () => {
@@ -761,3 +824,5 @@ export function Video() {
     </div>
   )
 }
+
+

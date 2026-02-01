@@ -2,12 +2,16 @@ import workflowTemplate from './wan-workflow.json'
 import nodeMapTemplate from './wan-node-map.json'
 import { createClient, type User } from '@supabase/supabase-js'
 import { buildCorsHeaders, isCorsBlocked } from '../_shared/cors'
+import { isUnderageImage } from '../_shared/rekognition'
 
 type Env = {
   RUNPOD_API_KEY: string
   RUNPOD_ENDPOINT_URL?: string
   RUNPOD_WAN_ENDPOINT_URL?: string
   COMFY_ORG_API_KEY?: string
+  AWS_ACCESS_KEY_ID?: string
+  AWS_SECRET_ACCESS_KEY?: string
+  AWS_REGION?: string
   SUPABASE_URL?: string
   SUPABASE_SERVICE_ROLE_KEY?: string
 }
@@ -58,6 +62,7 @@ const MAX_CFG = 10
 const FIXED_FPS = 10
 const FIXED_SECONDS = 5
 const FIXED_FRAMES = FIXED_FPS * FIXED_SECONDS
+const UNDERAGE_BLOCK_MESSAGE = '年齢ポリシーに違反する人物画像です。別の画像で試してください。'
 
 const getWorkflowTemplate = async () => workflowTemplate as Record<string, unknown>
 
@@ -617,6 +622,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (!imageBase64) {
     return jsonResponse({ error: 'image is empty.' }, 400, corsHeaders)
+  }
+
+  try {
+    if (await isUnderageImage(imageBase64, env)) {
+      return jsonResponse({ error: UNDERAGE_BLOCK_MESSAGE }, 400, corsHeaders)
+    }
+  } catch (error) {
+    return jsonResponse(
+      { error: error instanceof Error ? error.message : 'Age verification failed.' },
+      500,
+      corsHeaders,
+    )
   }
 
   const prompt = String(input?.prompt ?? input?.text ?? '')

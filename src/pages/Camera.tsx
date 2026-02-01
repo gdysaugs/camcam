@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -107,6 +107,57 @@ const buildEditPrompt = (value: string, directionPrompt?: string, elevationPromp
 const toBase64 = (dataUrl: string) => {
   const parts = dataUrl.split(',')
   return parts.length > 1 ? parts[1] : dataUrl
+}
+
+const MAX_REKOGNITION_BYTES = 5 * 1024 * 1024
+const IMAGE_SIZE_ERROR_MESSAGE = '画像サイズ上限(5MB)を超えています。別の画像で試してください。'
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('画像の読み込みに失敗しました。'))
+    reader.readAsDataURL(file)
+  })
+
+const loadImage = (dataUrl: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('画像の読み込みに失敗しました。'))
+    img.src = dataUrl
+  })
+
+const estimateBase64Bytes = (dataUrl: string) => {
+  const base64 = toBase64(dataUrl)
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - padding
+}
+
+const ensureRekognitionSize = (dataUrl: string) => {
+  if (estimateBase64Bytes(dataUrl) > MAX_REKOGNITION_BYTES) {
+    throw new Error(IMAGE_SIZE_ERROR_MESSAGE)
+  }
+}
+
+const convertFileToSupportedDataUrl = async (file: File) => {
+  const dataUrl = await readFileAsDataUrl(file)
+  const mimeMatch = dataUrl.match(/^data:(image\/[^;]+);base64,/)
+  const mime = mimeMatch?.[1]?.toLowerCase()
+  if (mime === 'image/jpeg' || mime === 'image/png') {
+    ensureRekognitionSize(dataUrl)
+    return dataUrl
+  }
+  const img = await loadImage(dataUrl)
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('画像変換に失敗しました。')
+  ctx.drawImage(img, 0, 0)
+  const converted = canvas.toDataURL('image/png')
+  ensureRekognitionSize(converted)
+  return converted
 }
 
 const normalizeImage = (value: unknown) => {
@@ -219,6 +270,36 @@ const isProbablyMobile = () => {
   return false
 }
 
+const normalizeErrorMessage = (value: unknown) => {
+  if (!value) return '生成に失敗しました。'
+  if (typeof value === 'object') {
+    const maybe = value as { error?: unknown; message?: unknown; detail?: unknown }
+    const picked = maybe?.error ?? maybe?.message ?? maybe?.detail
+    if (typeof picked === 'string' && picked) return picked
+    if (value instanceof Error && value.message) return value.message
+  }
+  const raw = typeof value === 'string' ? value : value instanceof Error ? value.message : String(value)
+  const lowered = raw.toLowerCase()
+  if (lowered.includes('invalidimageformatexception') || lowered.includes('invalid image format')) {
+    return '年齢判定はJPEG/PNGのみ対応です。別の画像で試してください。'
+  }
+  if (lowered.includes('image.bytes') || lowered.includes('5242880')) {
+    return IMAGE_SIZE_ERROR_MESSAGE
+  }
+  const trimmed = raw.trim()
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      const message = parsed?.error || parsed?.message || parsed?.detail
+      if (typeof message === 'string' && message) return message
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return raw
+}
+
+const normaliseErrorMessage = normalizeErrorMessage
 const extractErrorMessage = (payload: any) =>
   payload?.error ||
   payload?.message ||
@@ -400,7 +481,7 @@ export function Camera() {
       const data = await res.json().catch(() => ({}))
       const usageId = String(data?.usage_id ?? data?.usageId ?? '')
       if (!res.ok) {
-        const message = data?.error || data?.message || '生成に失敗しました。'
+        const message = normalizeErrorMessage(data?.error ?? data?.message ?? data?.detail ?? '生成に失敗しました。')
         throw new Error(message)
       }
       const images = extractImageList(data)
@@ -428,7 +509,7 @@ export function Camera() {
       const res = await fetch(`${API_ENDPOINT}?${query.toString()}`, { headers })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const message = data?.error || data?.message || 'ステータス取得に失敗しました。'
+        const message = normalizeErrorMessage(data?.error ?? data?.message ?? data?.detail ?? 'ステータス取得に失敗しました。')
         throw new Error(message)
       }
       const status = String(data?.status || data?.state || '').toLowerCase()
@@ -509,6 +590,7 @@ export function Camera() {
               ),
             )
             setStatusMessage(message)
+            window.alert(message)
           }
         }]
 
@@ -523,6 +605,7 @@ export function Camera() {
         const message = error instanceof Error ? error.message : '生成に失敗しました。'
         setStatusMessage(message)
         setResults((prev) => prev.map((item) => ({ ...item, status: 'error', error: message })))
+        window.alert(message)
       } finally {
         if (runIdRef.current === runId) {
           setIsRunning(false)
@@ -590,34 +673,38 @@ export function Camera() {
     setSourceNameSub('')
   }, [])
 
-  const handleMainFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleMainFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '')
+    try {
+      const dataUrl = await convertFileToSupportedDataUrl(file)
       const payload = toBase64(dataUrl)
       setSourcePreview(dataUrl)
       setSourcePayload(payload)
       setSourceName(file.name)
       setStatusMessage(session ? '生成準備OK' : 'Googleでログインしてください。')
+    } catch (error) {
+      const message = normalizeErrorMessage(error instanceof Error ? error.message : error)
+      setStatusMessage(message)
+      window.alert(message)
     }
-    reader.readAsDataURL(file)
   }
 
-  const handleSubFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleSubFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '')
+    try {
+      const dataUrl = await convertFileToSupportedDataUrl(file)
       const payload = toBase64(dataUrl)
       setSourcePreviewSub(dataUrl)
       setSourcePayloadSub(payload)
       setSourceNameSub(file.name)
       setStatusMessage(session ? '生成準備OK' : 'Googleでログインしてください。')
+    } catch (error) {
+      const message = normalizeErrorMessage(error instanceof Error ? error.message : error)
+      setStatusMessage(message)
+      window.alert(message)
     }
-    reader.readAsDataURL(file)
   }
 
   const handleGenerate = async () => {
@@ -904,3 +991,5 @@ export function Camera() {
     </div>
   )
 }
+
+

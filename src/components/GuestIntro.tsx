@@ -49,9 +49,6 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
             <button type="button" className="primary-button" onClick={onSignIn}>
               新規登録 / ログイン
             </button>
-            <button type="button" className="ghost-button" onClick={() => navigate('/purchase')}>
-              チケット購入
-            </button>
           </div>
           <div className="guest-badges">
             <span>新規登録は10秒で完了</span>
@@ -126,7 +123,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
           </article>
           <article className="guest-card">
             <h3>アングル変更（45度）</h3>
-            <p className="guest-prompt">プロンプト: 45度からの角度に変更</p>
+            <p className="guest-prompt">角度指定: 下45度</p>
             <div className="guest-single">
               <img src={ASSETS.angle} alt="45度アングルの生成結果" />
             </div>
@@ -149,9 +146,6 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
         <div className="guest-cta guest-cta--center">
           <button type="button" className="primary-button" onClick={onSignIn}>
             新規登録 / ログイン
-          </button>
-          <button type="button" className="ghost-button" onClick={() => navigate('/purchase')}>
-            チケット購入
           </button>
         </div>
       </section>
@@ -181,6 +175,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
           <li>実在する人物の性的な画像・動画の生成は禁止です。</li>
           <li>違法・有害・差別的・暴力的コンテンツの生成は禁止です。</li>
           <li>未成年に見える人物の性的な表現は禁止です。</li>
+          <li>児童と思われる人物画像は年齢判定システムによる自動判定でブロックされます。</li>
           <li>個人情報やなりすまし目的の生成は禁止です。</li>
           <li>著作権・肖像権など第三者の権利を侵害しないでください。</li>
           <li>第三者の権利や公序良俗に反する生成は行わないでください。</li>
