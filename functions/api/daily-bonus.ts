@@ -1,12 +1,9 @@
 import { createClient, type User } from '@supabase/supabase-js'
-import { buildCorsHeaders, isCorsBlocked } from '../../_shared/cors'
+import { buildCorsHeaders, isCorsBlocked } from '../_shared/cors'
 
 type Env = {
   SUPABASE_URL?: string
   SUPABASE_SERVICE_ROLE_KEY?: string
-  STRIPE_SECRET_KEY?: string
-  STRIPE_SUCCESS_URL?: string
-  STRIPE_CANCEL_URL?: string
 }
 
 const corsMethods = 'POST, OPTIONS'
@@ -59,15 +56,6 @@ const requireGoogleUser = async (request: Request, env: Env, corsHeaders: Header
   return { admin, user: data.user }
 }
 
-const PRICE_MAP = new Map([
-  ['price_1St4C9AL4umhcfEPAVXlq2RJ', { label: 'ライト', tickets: 30 }],
-  ['price_1St4CaAL4umhcfEP3UzuJtTy', { label: 'スタンダード', tickets: 80 }],
-  ['price_1St4D7AL4umhcfEPY3qOc74l', { label: 'プロ', tickets: 200 }],
-])
-
-const getRedirectUrl = (env: Env, request: Request, key: 'STRIPE_SUCCESS_URL' | 'STRIPE_CANCEL_URL', fallback: string) =>
-  env[key] ?? new URL(fallback, request.url).toString()
-
 export const onRequestOptions: PagesFunction<Env> = async ({ request, env }) => {
   const corsHeaders = buildCorsHeaders(request, env, corsMethods)
   if (isCorsBlocked(request, env)) {
@@ -87,57 +75,24 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return auth.response
   }
 
-  const stripeKey = env.STRIPE_SECRET_KEY
-  if (!stripeKey) {
-    return jsonResponse({ error: 'STRIPE_SECRET_KEY is not set.' }, 500, corsHeaders)
-  }
-
-  const payload = await request.json().catch(() => null)
-  if (!payload) {
-    return jsonResponse({ error: 'Invalid request body.' }, 400, corsHeaders)
-  }
-
-  const priceId = String(payload.price_id ?? payload.priceId ?? '')
-  const plan = PRICE_MAP.get(priceId)
-  if (!plan) {
-    return jsonResponse({ error: '不正なプランです。' }, 400, corsHeaders)
-  }
-
   const email = auth.user.email ?? ''
-  const successUrl = getRedirectUrl(env, request, 'STRIPE_SUCCESS_URL', '/?checkout=success')
-  const cancelUrl = getRedirectUrl(env, request, 'STRIPE_CANCEL_URL', '/?checkout=cancel')
-
-  const params = new URLSearchParams()
-  params.set('mode', 'payment')
-  params.set('success_url', successUrl)
-  params.set('cancel_url', cancelUrl)
-  params.set('line_items[0][price]', priceId)
-  params.set('line_items[0][quantity]', '1')
-  params.set('client_reference_id', auth.user.id)
-  if (email) {
-    params.set('customer_email', email)
-  }
-  params.set('metadata[user_id]', auth.user.id)
-  params.set('metadata[email]', email)
-  params.set('metadata[tickets]', String(plan.tickets))
-  params.set('metadata[price_id]', priceId)
-  params.set('metadata[plan_label]', plan.label)
-  params.set('metadata[app]', 'yajuai')
-
-  const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${stripeKey}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: params.toString(),
+  const { data, error } = await auth.admin.rpc('claim_daily_bonus', {
+    p_user_id: auth.user.id,
+    p_email: email,
   })
 
-  const stripeText = await stripeRes.text()
-  const stripeData = stripeText ? JSON.parse(stripeText) : null
-  if (!stripeRes.ok) {
-    return jsonResponse({ error: stripeData?.error?.message || 'Stripeのセッション作成に失敗しました。' }, 500, corsHeaders)
+  if (error) {
+    return jsonResponse({ error: error.message ?? 'デイリーボーナスに失敗しました。' }, 500, corsHeaders)
   }
 
-  return jsonResponse({ url: stripeData?.url }, 200, corsHeaders)
+  const result = Array.isArray(data) ? data[0] : data
+  return jsonResponse(
+    {
+      granted: Boolean(result?.granted),
+      next_eligible_at: result?.next_eligible_at ?? null,
+      reason: result?.reason ?? null,
+    },
+    200,
+    corsHeaders,
+  )
 }

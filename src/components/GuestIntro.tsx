@@ -13,6 +13,9 @@ const ASSETS = {
   pair: '/media/sample-pair.png',
   angle: '/media/sample-angle.png',
   video: '/media/sample-kiss.mp4',
+  usageFashion: '/media/usage-1999.png',
+  usageColor: '/media/usage-download-3.png',
+  usageAngle: '/media/usage-ai32.png',
 }
 
 export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
@@ -54,6 +57,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
             <span>新規登録は10秒で完了</span>
             <span>初回3枚チケット付与</span>
             <span>画像1枚 / 動画2枚</span>
+            <span>毎日ログインで生成1回無料</span>
           </div>
         </div>
       </section>
@@ -147,6 +151,39 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
           <button type="button" className="primary-button" onClick={onSignIn}>
             新規登録 / ログイン
           </button>
+        </div>
+      </section>
+
+      <section className="guest-section">
+        <div className="guest-section__header">
+          <h2>活用法</h2>
+          <p>
+            YAJU AIは、服・髪型の変更や色調・絵柄の調整、アングル変更まで一気にこなせるクリエイター向けサポートツール。
+            企画やラフ制作のスピードを上げながら、世界観の検証やアイデアの比較にも使えます。
+          </p>
+        </div>
+        <div className="guest-card-grid">
+          <article className="guest-card">
+            <h3>ファッション検証</h3>
+            <p>衣装や髪型を変えて、新しいスタイルをすばやく比較。</p>
+            <div className="guest-single">
+              <img src={ASSETS.usageFashion} alt="衣装変更の生成例" />
+            </div>
+          </article>
+          <article className="guest-card">
+            <h3>色調・絵柄の変更</h3>
+            <p>トーンや雰囲気を変えて、作品の方向性を検証。</p>
+            <div className="guest-single">
+              <img src={ASSETS.usageColor} alt="色調変更の生成例" />
+            </div>
+          </article>
+          <article className="guest-card">
+            <h3>漫画風加工</h3>
+            <p>手軽に陰影の確認やトレス作業に使える漫画風仕上げ。</p>
+            <div className="guest-single">
+              <img src={ASSETS.usageAngle} alt="漫画風加工の生成例" />
+            </div>
+          </article>
         </div>
       </section>
 

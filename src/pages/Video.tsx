@@ -181,6 +181,17 @@ const isFailureStatus = (status: string) => {
   return normalized.includes('fail') || normalized.includes('error') || normalized.includes('cancel')
 }
 
+const formatRemaining = (targetIso: string | null) => {
+  if (!targetIso) return ''
+  const target = new Date(targetIso).getTime()
+  if (!Number.isFinite(target)) return ''
+  const diff = target - Date.now()
+  if (diff <= 0) return ''
+  const hours = Math.floor(diff / 3_600_000)
+  const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  return `${hours}時間${minutes.toString().padStart(2, '0')}分`
+}
+
 const alignTo16 = (value: number) => Math.max(16, Math.round(value / 16) * 16)
 const PORTRAIT_MAX = { width: 576, height: 832 }
 const LANDSCAPE_MAX = { width: 832, height: 576 }
@@ -279,6 +290,8 @@ export function Video() {
   const [ticketStatus, setTicketStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [ticketMessage, setTicketMessage] = useState('')
   const [showTicketModal, setShowTicketModal] = useState(false)
+  const [dailyClaimStatus, setDailyClaimStatus] = useState<string | null>(null)
+  const [isClaimingDaily, setIsClaimingDaily] = useState(false)
   const runIdRef = useRef(0)
   const navigate = useNavigate()
 
@@ -614,6 +627,52 @@ export function Video() {
     await startBatch(sourcePayload)
   }
 
+  const handleClaimDaily = async () => {
+    if (!accessToken || !session) {
+      setDailyClaimStatus('ログインしてください。')
+      return
+    }
+    if (isClaimingDaily) return
+    setIsClaimingDaily(true)
+    setDailyClaimStatus(null)
+    try {
+      const res = await fetch('/api/daily-bonus', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message = normalizeErrorMessage(data?.error ?? data?.message ?? data?.detail ?? 'デイリーボーナスに失敗しました。')
+        setDailyClaimStatus(message)
+        window.alert(message)
+        return
+      }
+      if (data?.granted) {
+        setDailyClaimStatus('デイリーボーナスを受け取りました。')
+        if (accessToken) {
+          void fetchTickets(accessToken)
+        }
+      } else {
+        const reason = data?.reason
+        if (reason === 'cooldown' || reason === 'not_eligible_yet') {
+          const remain = formatRemaining(data?.next_eligible_at ?? null)
+          setDailyClaimStatus(remain ? `次の受け取りまで ${remain}` : 'まだ受け取れません。')
+        } else {
+          setDailyClaimStatus('まだ受け取れません。')
+        }
+      }
+    } catch (error) {
+      const message = normalizeErrorMessage(error instanceof Error ? error.message : error)
+      setDailyClaimStatus(message)
+      window.alert(message)
+    } finally {
+      setIsClaimingDaily(false)
+    }
+  }
+
   const isGif = displayVideo?.startsWith('data:image/gif')
   const canDownload = Boolean(displayVideo && !isGif)
 
@@ -715,6 +774,22 @@ export function Video() {
               {ticketStatus === 'loading' && 'チケット確認中…'}
               {ticketStatus !== 'loading' && `残りチケット: ${ticketCount ?? 0}`}
               {ticketStatus === 'error' && ticketMessage ? ` / ${ticketMessage}` : ''}
+            </div>
+          )}
+          {session && (
+            <div className="ticket-message daily-bonus-message">
+              <strong>デイリーボーナス</strong>
+              <div>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={handleClaimDaily}
+                  disabled={isClaimingDaily}
+                >
+                  {isClaimingDaily ? '処理中…' : '受け取る'}
+                </button>
+                {dailyClaimStatus && <span>{dailyClaimStatus}</span>}
+              </div>
             </div>
           )}
           <label className="upload-box">

@@ -250,6 +250,22 @@
   font-size: 0.85rem;
 }
 
+.daily-bonus-message strong {
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.daily-bonus-message div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.daily-bonus-message span {
+  display: inline-block;
+}
+
 .purchase-block {
   margin-top: 22px;
   display: grid;

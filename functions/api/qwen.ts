@@ -57,7 +57,8 @@ const MIN_GUIDANCE = 0
 const MAX_GUIDANCE = 10
 const MIN_ANGLE_STRENGTH = 0
 const MAX_ANGLE_STRENGTH = 1
-const UNDERAGE_BLOCK_MESSAGE = '年齢ポリシーに違反する人物画像です。別の画像で試してください。'
+const UNDERAGE_BLOCK_MESSAGE =
+  'Amazon rekognitionによる自動判定で画像の人物が18歳未満と判定されました。申し訳ありませんが別の画像でお試しください。'
 
 const getWorkflowTemplate = async () => workflowTemplate as Record<string, unknown>
 

@@ -6,6 +6,12 @@ type Env = {
   STRIPE_WEBHOOK_SECRET?: string
 }
 
+const YAJUAI_PRICE_IDS = new Set([
+  'price_1St4C9AL4umhcfEPAVXlq2RJ',
+  'price_1St4CaAL4umhcfEP3UzuJtTy',
+  'price_1St4D7AL4umhcfEPY3qOc74l',
+])
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -91,6 +97,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonResponse({ received: true })
   }
 
+  const appTag = String(session.metadata?.app ?? '')
+  if (appTag !== 'yajuai') {
+    return jsonResponse({ received: true })
+  }
+
+  const priceId = String(session.metadata?.price_id ?? '')
+  if (!priceId || !YAJUAI_PRICE_IDS.has(priceId)) {
+    return jsonResponse({ received: true })
+  }
+
   const tickets = Number(session.metadata?.tickets ?? 0)
   const email = String(session.metadata?.email ?? session.customer_details?.email ?? '')
   const userId = String(session.metadata?.user_id ?? session.client_reference_id ?? '')
@@ -104,6 +120,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const admin = getSupabaseAdmin(env)
   if (!admin) {
     return jsonResponse({ error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set.' }, 500)
+  }
+
+  const { data: userCheck, error: userCheckError } = await admin.auth.admin.getUserById(userId)
+  if (userCheckError || !userCheck?.user) {
+    return jsonResponse({ received: true })
   }
 
   const { data: rpcData, error: rpcError } = await admin.rpc('grant_tickets', {
