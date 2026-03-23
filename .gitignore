@@ -2,7 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
-.env.production
+.env.production.local
 .DS_Store
 # Large model weights
 runpod-worker-wan/models/

@@ -20,6 +20,7 @@ VITE_SUPABASE_REDIRECT_URL=https://your-domain
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4o-mini
 ```
+Production auth defaults are committed in .env.production to prevent login config loss after push/build.
 
 3) Supabase table
 ```
@@ -55,3 +56,11 @@ dist
 ```
 
 Set environment variables in Pages -> Settings -> Environment variables.
+
+## Safe Deploy (llms)
+
+Use this command for production deploy:
+
+npm run deploy:llms
+
+The script blocks deployment when Supabase auth values are missing from build output.
