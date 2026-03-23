@@ -17,6 +17,7 @@ type Env = {
 }
 
 const corsMethods = 'POST, GET, OPTIONS'
+const RUNPOD_WAN_ENDPOINT = 'https://api.runpod.ai/v2/5dcjmtds23r6ef'
 
 const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(body), {
@@ -24,8 +25,7 @@ const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
 
-const resolveEndpoint = (env: Env) =>
-  (env.RUNPOD_WAN_ENDPOINT_URL ?? env.RUNPOD_ENDPOINT_URL)?.replace(/\/$/, '')
+const resolveEndpoint = (_env: Env) => RUNPOD_WAN_ENDPOINT.replace(/\/$/, '')
 
 type NodeMapEntry = {
   id: string
@@ -60,8 +60,9 @@ const MAX_DIMENSION = 3000
 const MIN_CFG = 0
 const MAX_CFG = 10
 const FIXED_FPS = 10
-const FIXED_SECONDS = 5
-const FIXED_FRAMES = FIXED_FPS * FIXED_SECONDS
+const FIXED_SECONDS = 7
+// Wan i2v is stable with 4n+1 frame counts. 7s profile uses 81 frames.
+const FIXED_FRAMES = 81
 const UNDERAGE_BLOCK_MESSAGE =
   'Amazon rekognitionによる自動判定で画像の人物が18歳未満と判定されました。申し訳ありませんが別の画像でお試しください。'
 
