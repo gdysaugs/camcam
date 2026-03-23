@@ -17,14 +17,14 @@ type Env = {
 }
 
 const corsMethods = 'POST, GET, OPTIONS'
+const RUNPOD_QWEN_ENDPOINT = 'https://api.runpod.ai/v2/lyil7ycli83x4s'
 
 const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
-
-const resolveEndpoint = (env: Env) => env.RUNPOD_ENDPOINT_URL?.replace(/\/$/, '')
+const resolveEndpoint = (_env: Env) => RUNPOD_QWEN_ENDPOINT.replace(/\/$/, '')
 
 type NodeMapEntry = {
   id: string
