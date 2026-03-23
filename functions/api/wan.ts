@@ -60,8 +60,8 @@ const MAX_DIMENSION = 3000
 const MIN_CFG = 0
 const MAX_CFG = 10
 const FIXED_FPS = 10
-const FIXED_SECONDS = 7
-// Wan i2v is stable with 4n+1 frame counts. 7s profile uses 81 frames.
+const FIXED_SECONDS = 8
+// Wan i2v is stable with 4n+1 frame counts. 8s profile uses 81 frames.
 const FIXED_FRAMES = 81
 const UNDERAGE_BLOCK_MESSAGE =
   'Amazon rekognitionによる自動判定で画像の人物が18歳未満と判定されました。申し訳ありませんが別の画像でお試しください。'

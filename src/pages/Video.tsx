@@ -24,8 +24,8 @@ type RenderResult = {
 const MAX_PARALLEL = 1
 const API_ENDPOINT = '/api/wan'
 const FIXED_FPS = 10
-const FIXED_SECONDS = 7
-// Wan i2v is stable with 4n+1 frame counts. 7s profile uses 81 frames.
+const FIXED_SECONDS = 8
+// Wan i2v is stable with 4n+1 frame counts. 8s profile uses 81 frames.
 const FIXED_FRAME_COUNT = 81
 const FIXED_STEPS = 4
 const FIXED_CFG = 1
@@ -734,7 +734,7 @@ export function Video() {
         <div>
           <p className="camera-hero__eyebrow">YAJU AI</p>
           <h1>YAJU AI Video</h1>
-          <p className="camera-hero__lede">静止画から7秒の動画を生成します。</p>
+          <p className="camera-hero__lede">静止画から8秒の動画を生成します。</p>
         </div>
         <div className="camera-hero__badge">
           <span>高速AI生成</span>
@@ -840,7 +840,7 @@ export function Video() {
           <div className="stage-header">
             <div>
               <h2>プレビュー</h2>
-              <p>生成された7秒動画を表示します。</p>
+              <p>生成された8秒動画を表示します。</p>
             </div>
             {canDownload && (
               <div className="stage-actions">

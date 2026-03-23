@@ -74,7 +74,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
           </article>
           <article className="guest-feature">
             <h3>画像から動画生成</h3>
-            <p>静止画から7秒の動画を生成可能。SNS用の短尺素材も約1分で完成。</p>
+            <p>静止画から8秒の動画を生成可能。SNS用の短尺素材も約1分で完成。</p>
           </article>
           <article className="guest-feature">
             <h3>アングル変更</h3>
@@ -133,7 +133,7 @@ export function GuestIntro({ mode, onSignIn }: GuestIntroProps) {
             </div>
           </article>
           <article className="guest-card">
-            <h3>画像から動画（7秒）</h3>
+            <h3>画像から動画（8秒）</h3>
             <p className="guest-prompt">プロンプト: 男女でキスして</p>
             <div className="guest-single">
               <video controls playsInline preload="metadata" src={ASSETS.video} />
