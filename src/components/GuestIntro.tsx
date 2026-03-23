@@ -12,7 +12,7 @@ const ASSETS = {
   sub: '/media/sample-sub.jpg',
   pair: '/media/sample-pair.png',
   angle: '/media/sample-angle.png',
-  video: '/media/sample-kiss.mp4',
+  video: '/media/sample-kiss.mp4?v=20260324a',
   usageFashion: '/media/usage-1999.png',
   usageColor: '/media/usage-download-3.png',
   usageAngle: '/media/usage-ai32.png',
